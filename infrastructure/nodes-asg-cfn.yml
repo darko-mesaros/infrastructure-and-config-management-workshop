@@ -1,5 +1,8 @@
 # Nodes Autoscalign Cloudformation template 
 AWSTemplateFormatVersion: "2010-09-09" 
+Parameters:
+  Key:
+    Type: AWS::EC2::KeyPair::KeyName 
 Resources: 
   VPC: 
     Type: AWS::EC2::VPC 
@@ -134,6 +137,9 @@ Resources:
         - Key: Name 
           Value: WebServerProd 
           PropagateAtLaunch: true
+        - Key: ssm_state
+          Value: ansible_webserver
+          PropagateAtLaunch: true
  
   LaunchConfig: 
     Type: 'AWS::AutoScaling::LaunchConfiguration' 
@@ -143,7 +149,7 @@ Resources:
        
       SecurityGroups: 
         - !Ref SG 
-      KeyName: !Ref Key 
+      KeyName: !Ref Key
       InstanceType: 't2.micro' 
       IamInstanceProfile: !Ref InstanceProfile 
       UserData: 
@@ -185,6 +191,21 @@ Resources:
       Tags: 
         - Key: Name 
           Value: WebServerProd 
+
+  UpdateSSMAgent:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: runAnsibleOnWebservers
+      Name: AWS-RunAnsiblePlaybook
+      ScheduleExpression: "cron(0 */30 * * * ? *)"
+      Parameters:
+        check: ["False"]
+        playbookurl: ["s3://darko-ansible-webserver/webserver.yml"]
+        extravars: ["SSM=True"]
+      Targets:
+      - Key: "tag:ssm_state"
+        Values:
+          - "ansible_webserver"
  
   InstanceRole: 
     Type: AWS::IAM::Role 

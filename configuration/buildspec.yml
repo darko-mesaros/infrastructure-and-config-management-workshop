@@ -2,13 +2,13 @@ version: 0.2
  
 phases: 
   install:  
+    runtime-versions:
+      python: 3.7
     commands: 
-      - echo Build started on `date` 
-      - sudo apt update -y 
-      - sudo apt install -y python-pip 
       - pip install ansible-lint 
   build: 
     commands: 
+      - echo Build started on `date` 
       - ansible-lint webserver.yml 
 #  post_build: 
 #    commands: 
