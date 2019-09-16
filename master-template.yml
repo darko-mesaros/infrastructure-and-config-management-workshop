@@ -1,0 +1,215 @@
+# This is the master template for setting up the workshop environment
+# TODO:
+# 1 Bucket for Ansible
+# 2 CodeCommit
+# 2 CodePipeline
+# 2 CodeBuilds
+# 1 Cloud9
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Master Template for the Managing Infrastructure and Configuration in AWS Workshop"
+Resources:
+    infraRepo:
+      Type: AWS::CodeCommit::Repository
+      Properties:
+        RepositoryName: "cfn-infra-workshop"
+        RepositoryDescription: "Repository with my Infrastructure code"
+# ---
+    infraPipelineStoreBucket:
+      Type: AWS::S3::Bucket
+# ---
+    configRepo:
+      Type: AWS::CodeCommit::Repository
+      Properties:
+        RepositoryName: "ansible-config-workshop"
+        RepositoryDescription: "Repository with my Infrastructure code"
+# ---
+    configPipelineStoreBucket:
+      Type: AWS::S3::Bucket
+# ---
+    infraCodebuildProject:
+      Type: AWS::CodeBuild::Project
+      Properties:
+        Artifacts:
+          Type: CODEPIPELINE
+        Description: AWS CodeBuild Project for CloudFormation template testing
+        Environment:
+          Type: LINUX_CONTAINER
+          ComputeType: BUILD_GENERAL1_SMALL
+          Image: aws/codebuild/amazonlinux2-x86_64-standard:1.0 
+        Name: CloudFormation_Testing
+        ServiceRole: !Ref 'CodeBuildRole'
+        Source:
+          Type: CODEPIPELINE
+        TimeoutInMinutes: 10
+# ---
+    configCodebuildProject:
+      Type: AWS::CodeBuild::Project
+      Properties:
+        Artifacts:
+          Type: CODEPIPELINE
+        Description: AWS CodeBuild Project for Ansible testing
+        Environment:
+          Type: LINUX_CONTAINER
+          ComputeType: BUILD_GENERAL1_SMALL
+          Image: aws/codebuild/amazonlinux2-x86_64-standard:1.0 
+        Name: Configuration_Ansible_Testing
+        ServiceRole: !Ref 'CodeBuildRole'
+        Source:
+          Type: CODEPIPELINE
+        TimeoutInMinutes: 10
+# ---
+    infraPipeline:
+      Type: AWS::CodePipeline::Pipeline
+      Properties:
+        Name: cloudformation-testing-pipeline
+        ArtifactStore:
+          Type: S3
+          Location: !Ref 'infraPipelineStoreBucket'
+        RestartExecutionOnUpdate: False
+        RoleArn: !GetAtt 'CodePipelineRole.Arn'
+        Stages:
+          - Name: Source
+            Actions:
+              - InputArtifacts: []
+                Name: Source
+                ActionTypeId:
+                  Category: Source
+                  Owner: AWS
+                  Version: '1'
+                  Provider: CodeCommit
+                OutputArtifacts:
+                  - Name: SourceArtifact
+                Configuration:
+                  RepositoryName: !GetAtt 'infraRepo.Name'
+                  BranchName: master
+                  PollForSourceChanges: 'True'
+                RunOrder: 1
+          - Name: Testing
+            Actions:
+              - InputArtifacts:
+                  - Name: SourceArtifact
+                Name: Testing
+                ActionTypeId:
+                  Category: Test
+                  Owner: AWS
+                  Version: '1'
+                  Provider: CodeBuild
+                OutputArtifacts:
+                  - Name: CfnBuildArtifact
+                Configuration:
+                  ProjectName: !Ref 'infraCodebuildProject'
+                RunOrder: 2
+          - Name: Deploy
+            Actions:
+              - InputArtifacts:
+                - Name: CfnBuildArtifact
+                Name: Deploy
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Version: '1'
+                  Provider: CloudFormation
+                Configuration:
+                  ActionMode: CREATE_UPDATE
+                  Capabilities: CAPABILITY_IAM
+                  ParameterOverrides: '{"Key":"darko-eu-west-1"}'
+                  RoleArn: arn:aws:iam::824852318651:role/CloudFormation-ServiceRole # TODO
+                  StackName: workshop-webservers
+                  TemplatePath: CfnBuildArtifact::nodes-asg-cfn.yml
+                RunOrder: 3
+# ---
+    CodePipelineRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: ''
+              Effect: Allow
+              Principal:
+                Service: codepipeline.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: CodePipelineChefDemo
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Action:
+                    - s3:GetObject
+                    - s3:GetObjectVersion
+                    - s3:GetBucketVersioning
+                  Resource: '*'
+                  Effect: Allow
+                - Action:
+                    - s3:PutObject
+                  Resource:
+                    - arn:aws:s3:::codepipeline*
+                    - arn:aws:s3:::elasticbeanstalk*
+                  Effect: Allow
+                - Action:
+                    - ec2:*
+                    - cloudwatch:*
+                    - s3:*
+                    - sns:*
+                    - cloudformation:*
+                    - iam:PassRole
+                  Resource: '*'
+                  Effect: Allow
+                - Action:
+                    - codebuild:BatchGetBuilds
+                    - codebuild:StartBuild
+                  Resource: '*'
+                  Effect: Allow
+                - Action:
+                    - codedeploy:CreateDeployment
+                    - codedeploy:GetApplicationRevision
+                    - codedeploy:GetDeployment
+                    - codedeploy:GetDeploymentConfig
+                    - codedeploy:RegisterApplicationRevision
+                  Resource: '*'
+                  Effect: Allow
+                - Action:
+                    - codecommit:CancelUploadArchive
+                    - codecommit:GetBranch
+                    - codecommit:GetCommit
+                    - codecommit:GetUploadArchiveStatus
+                    - codecommit:UploadArchive
+                  Resource: '*'
+                  Effect: Allow
+                - Action:
+                    - lambda:invokefunction
+                    - lambda:listfunctions
+                  Resource: '*'
+                  Effect: Allow
+# ---
+    CodeBuildRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+            - Action:
+                - sts:AssumeRole
+              Effect: Allow
+              Principal:
+                Service:
+                  - codebuild.amazonaws.com
+          Version: '2012-10-17'
+        Path: /
+        Policies:
+          - PolicyName: CodeBuildAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Action:
+                    - ec2:*
+                    - cloudwatch:*
+                    - logs:*
+                    - sns:*
+                    - s3:CreateBucket
+                    - s3:GetObject
+                    - s3:List*
+                    - s3:PutObject
+                  Effect: Allow
+                  Resource: '*'
+# ---

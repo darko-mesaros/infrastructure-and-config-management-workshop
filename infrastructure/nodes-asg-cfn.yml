@@ -1,9 +1,5 @@
 # Nodes Autoscalign Cloudformation template 
 AWSTemplateFormatVersion: "2010-09-09" 
-Parameters: 
-  Key: 
-    Type: AWS::EC2::KeyPair::KeyName 
- 
 Resources: 
   VPC: 
     Type: AWS::EC2::VPC 
@@ -194,7 +190,8 @@ Resources:
     Type: AWS::IAM::Role 
     Properties: 
       ManagedPolicyArns:  
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM 
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
       AssumeRolePolicyDocument: 
         Statement: 
         - Action: 
