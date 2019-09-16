@@ -1,0 +1,226 @@
+# Nodes Autoscalign Cloudformation template 
+AWSTemplateFormatVersion: "2010-09-09" 
+Parameters: 
+  Key: 
+    Type: AWS::EC2::KeyPair::KeyName 
+ 
+Resources: 
+  VPC: 
+    Type: AWS::EC2::VPC 
+    Properties: 
+      CidrBlock: 10.0.0.0/16 
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: 'default' 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+   
+  Subnet: 
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      VpcId: !Ref VPC 
+      CidrBlock: '10.0.0.0/24' 
+      AvailabilityZone: 'eu-west-1a' 
+      MapPublicIpOnLaunch: true 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  SubnetB: 
+    Type: AWS::EC2::Subnet 
+    Properties: 
+      VpcId: !Ref VPC 
+      CidrBlock: '10.0.1.0/24' 
+      AvailabilityZone: 'eu-west-1b' 
+      MapPublicIpOnLaunch: true 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  IGW: 
+    Type: AWS::EC2::InternetGateway 
+    Properties: 
+      Tags: 
+      - Key: Name 
+        Value: WebServerProd 
+ 
+  AttachIGW: 
+    Type: AWS::EC2::VPCGatewayAttachment 
+    Properties: 
+      VpcId: !Ref VPC 
+      InternetGatewayId: !Ref IGW 
+   
+  RouteTable: 
+    Type: AWS::EC2::RouteTable 
+    Properties: 
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  Route: 
+    Type: AWS::EC2::Route 
+    DependsOn: AttachIGW 
+    Properties: 
+      RouteTableId: !Ref RouteTable 
+      DestinationCidrBlock: '0.0.0.0/0' 
+      GatewayId: !Ref IGW 
+ 
+ 
+  SubnetRouteTableAssoc: 
+    Type: AWS::EC2::SubnetRouteTableAssociation 
+    Properties: 
+      SubnetId: !Ref Subnet 
+      RouteTableId: !Ref RouteTable 
+  SubnetRouteTableAssocB: 
+    Type: AWS::EC2::SubnetRouteTableAssociation 
+    Properties: 
+      SubnetId: !Ref SubnetB 
+      RouteTableId: !Ref RouteTable 
+ 
+  SG: 
+    Type: "AWS::EC2::SecurityGroup" 
+    Properties: 
+      GroupDescription: "SSH and HTTP" 
+      VpcId: !Ref VPC 
+      SecurityGroupIngress: 
+        - 
+          CidrIp: "0.0.0.0/0" 
+          IpProtocol: "tcp" 
+          FromPort: 22
+          ToPort: 22 
+        - 
+          SourceSecurityGroupId: !Ref LBSG 
+          IpProtocol: "tcp" 
+          FromPort: 80 
+          ToPort: 80 
+      SecurityGroupEgress: 
+        -  
+          CidrIp: "0.0.0.0/0" 
+          IpProtocol: "-1" 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  LBSG: 
+    Type: "AWS::EC2::SecurityGroup" 
+    Properties: 
+      GroupDescription: "LoadBalancer Security Group" 
+      VpcId: !Ref VPC 
+      SecurityGroupIngress: 
+        - 
+          CidrIp: "0.0.0.0/0" 
+          IpProtocol: "tcp" 
+          FromPort: 80 
+          ToPort: 80 
+      SecurityGroupEgress: 
+        -  
+          CidrIp: "0.0.0.0/0" 
+          IpProtocol: "-1" 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  ASG: 
+    Type: AWS::AutoScaling::AutoScalingGroup 
+    Properties: 
+      VPCZoneIdentifier: 
+        - !Ref Subnet 
+        - !Ref SubnetB 
+      LaunchConfigurationName: !Ref LaunchConfig 
+      MinSize: '1' 
+      MaxSize: '5' 
+      DesiredCapacity: '3' 
+      TargetGroupARNs: 
+        - !Ref ALBTargetGroup 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+          PropagateAtLaunch: true
+ 
+  LaunchConfig: 
+    Type: 'AWS::AutoScaling::LaunchConfiguration' 
+    Properties: 
+      AssociatePublicIpAddress: true
+      ImageId: 'ami-047bb4163c506cd98' 
+       
+      SecurityGroups: 
+        - !Ref SG 
+      KeyName: !Ref Key 
+      InstanceType: 't2.micro' 
+      IamInstanceProfile: !Ref InstanceProfile 
+      UserData: 
+        'Fn::Base64': | 
+          #!/bin/bash 
+          sudo pip install ansible 
+  ALB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer 
+    Properties: 
+      Subnets:  
+        - !Ref Subnet 
+        - !Ref SubnetB 
+      SecurityGroups: 
+        - !Ref LBSG 
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  ALBListener: 
+    Type: AWS::ElasticLoadBalancingV2::Listener 
+    Properties: 
+      DefaultActions: 
+        - Type: 'forward' 
+          TargetGroupArn: !Ref ALBTargetGroup 
+      LoadBalancerArn: !Ref ALB 
+      Port: 80
+      Protocol: 'HTTP' 
+ 
+  ALBTargetGroup: 
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup 
+    Properties: 
+      Port: 80
+      Protocol: 'HTTP' 
+      VpcId: !Ref VPC 
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 25
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      Tags: 
+        - Key: Name 
+          Value: WebServerProd 
+ 
+  InstanceRole: 
+    Type: AWS::IAM::Role 
+    Properties: 
+      ManagedPolicyArns:  
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM 
+      AssumeRolePolicyDocument: 
+        Statement: 
+        - Action: 
+          - sts:AssumeRole 
+          Effect: Allow 
+          Principal: 
+            Service: 
+            - ec2.amazonaws.com 
+        Version: '2012-10-17' 
+      Path: / 
+ 
+  InstanceProfile: 
+    Type: AWS::IAM::InstanceProfile 
+    Properties: 
+      Path: / 
+      Roles: 
+      - Ref: InstanceRole 
+ 
+Outputs: 
+  SubnetAID: 
+    Description: Subnet A ID 
+    Value: !Ref Subnet 
+  SubnetBID: 
+    Description: Subnet A ID 
+    Value: !Ref SubnetB 
+  ALBDNSName: 
+    Description: Application Load Balancer Endpoint DNS entry 
+    Value: !GetAtt 'ALB.DNSName' 
+ 

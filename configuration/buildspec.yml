@@ -1,0 +1,19 @@
+version: 0.2 
+ 
+phases: 
+  install:  
+    commands: 
+      - echo Build started on `date` 
+      - sudo apt update -y 
+      - sudo apt install -y python-pip 
+      - pip install ansible-lint 
+  build: 
+    commands: 
+      - ansible-lint webserver.yml 
+  post_build: 
+    commands: 
+      - aws s3 cp webserver.yml s3://darko-ansible-webserver/ 
+      - echo Build completed on `date` 
+artifacts: 
+  files: 
+    - '**/*' 

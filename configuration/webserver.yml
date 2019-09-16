@@ -1,0 +1,30 @@
+--- 
+- name: Install nginx 
+  hosts: all 
+  become: true 
+ 
+  tasks: 
+    - name: Install nginx 
+      yum: 
+        name: nginx 
+        state: present 
+    - name: Start NGiNX 
+      service: 
+        name: nginx 
+        state: started 
+    - name: Modify Web 
+      copy: 
+        content: '<h2>Hello from Berlin</h2>' 
+        dest: /usr/share/nginx/html/index.html 
+    - name: Create user Darko 
+      user: 
+        name: darko 
+        comment: "Darko Meszaros" 
+        uid: 1040 
+        group: wheel 
+    - name: Create user Bob 
+      user: 
+        name: bob 
+        comment: "Bob loves .asCode" 
+        group: wheel 
+ 
