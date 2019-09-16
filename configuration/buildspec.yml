@@ -10,10 +10,10 @@ phases:
   build: 
     commands: 
       - ansible-lint webserver.yml 
-  post_build: 
-    commands: 
-      - aws s3 cp webserver.yml s3://darko-ansible-webserver/ 
-      - echo Build completed on `date` 
+#  post_build: 
+#    commands: 
+#      - aws s3 cp webserver.yml s3://darko-ansible-webserver/ 
+#      - echo Build completed on `date` 
 artifacts: 
   files: 
     - '**/*' 
