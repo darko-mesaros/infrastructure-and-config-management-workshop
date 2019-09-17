@@ -35,6 +35,8 @@ We need to create a S3 bucket that will contain our Ansible code. Later on we wi
 
 No special configuration is required for this bucket - just take a note of the name.
 
+---
+
 ## Create the automation pipeline for CloudFormation
 - Create Code commit
 - Commit some code there (the cloudformation templates) - Via cloud9
