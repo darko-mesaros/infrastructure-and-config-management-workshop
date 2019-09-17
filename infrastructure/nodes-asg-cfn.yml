@@ -3,6 +3,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
   Key:
     Type: AWS::EC2::KeyPair::KeyName 
+  ansibleBucket:
+    Type: String
 Resources: 
   VPC: 
     Type: AWS::EC2::VPC 
@@ -199,8 +201,8 @@ Resources:
       Name: AWS-RunAnsiblePlaybook
       ScheduleExpression: "cron(0 */30 * * * ? *)"
       Parameters:
-        check: ["false"]
-        playbookurl: ["s3://darko-ansible-webserver/webserver.yml"]
+        check: ["False"]
+        playbookurl: [!Sub 's3://${ansibleBucket}/webserver.yml']
         extravars: ["SSM=True"]
       Targets:
       - Key: "tag:ssm_state"
@@ -242,3 +244,4 @@ Outputs:
     Description: Application Load Balancer Endpoint DNS entry 
     Value: !GetAtt 'ALB.DNSName' 
  
+
