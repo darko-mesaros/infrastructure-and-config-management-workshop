@@ -1,4 +1,4 @@
-# Nodes Autoscalign Cloudformation template 
+# Nodes ASG Cloudformation template 
 AWSTemplateFormatVersion: "2010-09-09" 
 Parameters:
   Key:
@@ -199,7 +199,7 @@ Resources:
       Name: AWS-RunAnsiblePlaybook
       ScheduleExpression: "cron(0 */30 * * * ? *)"
       Parameters:
-        check: ["False"]
+        check: ["false"]
         playbookurl: ["s3://darko-ansible-webserver/webserver.yml"]
         extravars: ["SSM=True"]
       Targets:

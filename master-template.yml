@@ -276,4 +276,4 @@ Outputs:
   ansibleBucketName:
     Value: !Ref ansibleBucket
     Export:
-      Name: !Ref ansibleBucket
+      Name: ansibleBucketName
