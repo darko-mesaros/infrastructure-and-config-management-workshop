@@ -1,2 +1,5 @@
-# infrastructure-and-config-management-workshop
-Manage Your infrastructure and configuration on AWS - Workshop
+# Infrastructure and Configuration Management Workshop
+
+*Here be dragons*
+
+Full workshop guide coming soon.
